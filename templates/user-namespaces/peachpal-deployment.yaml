@@ -13,8 +13,6 @@ metadata:
 data:
   LOG_LEVEL: "DEBUG"
   GUARDRAILS_ENABLED: "false"
-  GUARDRAILS_ORCHESTRATOR_SERVICE_SERVICE_HOST: "guardrails-orchestrator-gateway"
-  GUARDRAILS_ORCHESTRATOR_SERVICE_SERVICE_PORT_GATEWAY: "8090"
   VLLM_MODEL: "llama32-fp8"
   MAX_TOKENS: "200"
   TEMPERATURE: "0"
@@ -54,7 +52,7 @@ spec:
     spec:
       containers:
         - name: peachpal
-          image: quay.io/ckavili/lemon-fastapi:1.0.23
+          image: quay.io/ckavili/peachpal:0.0.1
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
