@@ -1,15 +1,18 @@
+{{ $attendees := (add1 .Values.attendees | int) }}
+{{- range $attendee := untilStep 1 $attendees 1 }}
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: peachpal-config
+  namespace: user{{ $attendee }}-peachpal
   labels:
     app: peachpal
     app.kubernetes.io/name: peachpal
     app.kubernetes.io/component: config
 data:
   LOG_LEVEL: "DEBUG"
-  GUARDRAILS_ENABLED: "true"
+  GUARDRAILS_ENABLED: "false"
   GUARDRAILS_ORCHESTRATOR_SERVICE_SERVICE_HOST: "guardrails-orchestrator-gateway"
   GUARDRAILS_ORCHESTRATOR_SERVICE_SERVICE_PORT_GATEWAY: "8090"
   VLLM_MODEL: "llama32-fp8"
@@ -20,6 +23,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: peachpal-system-prompt
+  namespace: user{{ $attendee }}-peachpal
   labels:
     app: peachpal
     app.kubernetes.io/name: peachpal
@@ -32,6 +36,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: peachpal
+  namespace: user{{ $attendee }}-peachpal
   labels:
     app: peachpal
     app.kubernetes.io/name: peachpal
@@ -111,6 +116,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: peachpal
+  namespace: user{{ $attendee }}-peachpal
   labels:
     app: peachpal
     app.kubernetes.io/name: peachpal
@@ -129,6 +135,7 @@ apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
   name: peachpal
+  namespace: user{{ $attendee }}-peachpal
   labels:
     app: peachpal
     app.kubernetes.io/name: peachpal
@@ -155,6 +162,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: peachpal-secrets
+  namespace: user{{ $attendee }}-peachpal
   labels:
     app: peachpal
     app.kubernetes.io/name: peachpal
@@ -167,6 +175,7 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: peachpal
+  namespace: user{{ $attendee }}-peachpal
   labels:
     app: peachpal
     app.kubernetes.io/name: peachpal
@@ -179,3 +188,4 @@ spec:
     - port: http
       path: /metrics
       interval: 3s
+{{- end }}
