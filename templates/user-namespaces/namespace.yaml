@@ -7,6 +7,7 @@ metadata:
   name: user{{ $attendee }}-peachpal
   labels:
     kubernetes.io/metadata.name: user{{ $attendee }}-peachpal
+    opendatahub.io/dashboard: 'true'
   annotations:
     openshift.io/description: 'user{{ $attendee }} Peachpal Development Environment'
     openshift.io/display-name: 'user{{ $attendee }}-peachpal'
@@ -14,6 +15,4 @@ metadata:
 spec:
   finalizers:
     - kubernetes
-status:
-  phase: Active
 {{- end}}
