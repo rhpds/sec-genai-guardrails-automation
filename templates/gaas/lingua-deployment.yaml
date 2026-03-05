@@ -3,6 +3,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: lingua-detector
+  namespace: gaas
   labels:
     app: lingua-detector
 spec:
@@ -44,6 +45,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: lingua-detector
+  namespace: gaas
   labels:
     app: lingua-detector
 spec:
@@ -57,6 +59,7 @@ apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
   name: lingua-detector
+  namespace: gaas
   labels:
     app: lingua-detector
 spec:
