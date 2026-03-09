@@ -13,7 +13,7 @@ metadata:
 data:
   LOG_LEVEL: "DEBUG"
   GUARDRAILS_ENABLED: "false" #<- change to 'true' to enable guardrails
-  VLLM_MODEL: "llama32-fp8"
+  VLLM_MODEL: "granite-3-2-8b-instruct"
   MAX_TOKENS: "200"
   TEMPERATURE: "0"
 ---
