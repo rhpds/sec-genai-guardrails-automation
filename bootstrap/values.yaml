@@ -1,5 +1,6 @@
 ---
 attendees: 3
+vllm_api_key: fake
 user:
   count: 3
   prefix: user
