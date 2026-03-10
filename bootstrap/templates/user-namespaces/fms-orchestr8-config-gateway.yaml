@@ -19,7 +19,7 @@ data:
         output: true
         detector_params:
           regex:    
-            - \b(?i:orange|apple|cranberry|pineapple|grape)\b
+            - (?i)\b(orange|apple)s?\b
     routes:
       - name: all
         detectors:
