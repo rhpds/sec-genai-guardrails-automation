@@ -14,7 +14,7 @@ data:
   LOG_LEVEL: "DEBUG"
   GUARDRAILS_ENABLED: "false" #<- change to 'true' to enable guardrails
   VLLM_MODEL: "granite-3-2-8b-instruct"
-  MAX_TOKENS: "200"
+  MAX_TOKENS: "300"
   TEMPERATURE: "0"
 ---
 apiVersion: v1
