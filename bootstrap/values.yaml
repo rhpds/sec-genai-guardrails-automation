@@ -1,6 +1,7 @@
 ---
 attendees: 3
 vllm_api_key: fake
+maas_endpoint: litemaas.abc.com
 user:
   count: 3
   prefix: user

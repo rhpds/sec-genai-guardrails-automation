@@ -24,7 +24,7 @@ data:
             port: 8085
     openai: 
       service:
-        hostname: litellm-prod.apps.maas.redhatworkshops.io
+        hostname: {{ .Values.maas_endpoint }}
         port: 443
         tls: external_llm
     detectors:
