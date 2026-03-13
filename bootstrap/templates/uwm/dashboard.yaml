@@ -240,7 +240,7 @@ data:
                     "legendLink": null
                 },
                 {
-                     "expr": "sum(trustyai_guardrails_requests_total{detector_kind=\"custom\",detector_name=\"refusal_tracker\",namespace=\"$namespace\"})",
+                    "expr": "sum(trustyai_guardrails_requests_total{detector_kind=\"custom\",detector_name=\"refusal_tracker\",namespace=\"$namespace\"})",
                     "format": "time_series",
                     "legendFormat": "System Prompt",
                     "legendLink": null
