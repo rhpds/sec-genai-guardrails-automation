@@ -236,11 +236,11 @@ data:
                 {
                     "expr": "sum(guardrail_detections_by_detector{namespace=\"$namespace\",detector=\"regex_competitor\"})",
                     "format": "time_series",
-                    "legendFormat": "Non Peach",
+                    "legendFormat": "Non-Peach",
                     "legendLink": null
                 },
                 {
-                    "expr": "sum(refusal_counter_total{namespace=\"$namespace\"})",
+                     "expr": "sum(trustyai_guardrails_requests_total{detector_kind=\"custom\",detector_name=\"refusal_tracker\",namespace=\"$namespace\"})",
                     "format": "time_series",
                     "legendFormat": "System Prompt",
                     "legendLink": null
