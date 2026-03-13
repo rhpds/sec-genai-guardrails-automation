@@ -238,6 +238,12 @@ data:
                     "format": "time_series",
                     "legendFormat": "Non Peach",
                     "legendLink": null
+                },
+                {
+                    "expr": "sum(refusal_counter_total{namespace=\"$namespace\"})",
+                    "format": "time_series",
+                    "legendFormat": "System Prompt",
+                    "legendLink": null
                 }
                 ],
                 "thresholds": [],
