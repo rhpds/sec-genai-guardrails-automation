@@ -1,0 +1,16 @@
+# Workaround: TrustyAI Guardrails Orchestrator image override
+# Due to a race condition bug in the orchestrator (fix not yet landed downstream),
+# we override the orchestrator image in the operator config.
+# Setting opendatahub.io/managed: "false" prevents the operator from reverting the change.
+# ServerSideApply ensures ArgoCD merges these fields without replacing the full ConfigMap.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trustyai-service-operator-config
+  namespace: redhat-ods-applications
+  annotations:
+    opendatahub.io/managed: "false"
+    argocd.argoproj.io/sync-options: ServerSideApply=true
+data:
+  guardrails-orchestrator-image: "quay.io/ckavili/fms-guardrails-orchestrator:race-fix"
