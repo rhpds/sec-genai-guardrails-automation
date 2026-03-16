@@ -24,7 +24,7 @@ data:
             port: 8085
     openai: 
       service:
-        hostname: {{ $.Values.maas_endpoint }}
+        hostname: {{ $.Values.maas_endpoint | trimPrefix "https://" | trimPrefix "http://" | regexReplaceAll ":[0-9]+$" "" }}
         port: 443
         tls: external_llm
     detectors:
