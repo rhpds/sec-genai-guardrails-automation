@@ -17,7 +17,6 @@ data:
 
     MODEL_URL = "https://{{ $.Values.maas_endpoint | trimPrefix "https://" | trimPrefix "http://" }}/v1/chat/completions"
     MODEL_NAME = "granite-3-2-8b-instruct"
-
     API_TOKEN = "{{ $.Values.vllm_api_key }}"
 
     # === TURN POLICY LIST INTO PROMPTS ================================================================
