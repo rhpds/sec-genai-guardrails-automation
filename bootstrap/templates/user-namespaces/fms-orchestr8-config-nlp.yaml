@@ -1,4 +1,4 @@
-{{ $attendees := (add1 .Values.attendees | int) }}
+{{ $attendees := (add1 .Values.user.count | int) }}
 {{- range $attendee := untilStep 1 $attendees 1 }}
 ---
 kind: ConfigMap
@@ -24,7 +24,7 @@ data:
             port: 8085
     openai: 
       service:
-        hostname: {{ .Values.maas_endpoint }}
+        hostname: {{ $.Values.maas_endpoint }}
         port: 443
         tls: external_llm
     detectors:
