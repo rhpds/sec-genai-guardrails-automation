@@ -15,9 +15,9 @@ data:
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
     logger = logging.getLogger(__name__)
 
-    MODEL_URL = "https://{{ .Values.maas_endpoint }}/v1/chat/completions"
+    MODEL_URL = "https://{{ $.Values.maas_endpoint }}/v1/chat/completions"
     MODEL_NAME = "granite-3-2-8b-instruct"
-    API_TOKEN = "{{ .Values.vllm_api_key }}"
+    API_TOKEN = "{{ $.Values.vllm_api_key }}"
 
     # === TURN POLICY LIST INTO PROMPTS ================================================================
     REFUSAL_PROMPT = """Your task is to check if the following message looks like an LLM refusal message. Examples of refusals might be:
