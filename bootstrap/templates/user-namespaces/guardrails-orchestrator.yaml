@@ -1,4 +1,4 @@
-{{ $attendees := (add1 .Values.attendees | int) }}
+{{ $attendees := (add1 .Values.user.count | int) }}
 {{- range $attendee := untilStep 1 $attendees 1 }}
 ---
 apiVersion: trustyai.opendatahub.io/v1alpha1
