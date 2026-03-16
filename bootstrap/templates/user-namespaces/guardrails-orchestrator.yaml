@@ -26,6 +26,6 @@ spec:
           name: peachpal-config
           key: VLLM_MODEL
     - name: PROMETHEUS_MULTIPROC_DIR
-      value: /tmp/prometheus_multiproc
+      value: /tmp/
   replicas: 1
 {{- end }}
