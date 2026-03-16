@@ -167,7 +167,7 @@ metadata:
     app.kubernetes.io/component: config
 type: Opaque
 stringData:
-  vllm-api-key: ""
+  vllm-api-key: "{{ $.Values.vllm_api_key }}"
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
