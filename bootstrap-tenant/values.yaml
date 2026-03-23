@@ -1,4 +1,7 @@
 ---
-username: user1
+tenant:
+  username: user1
+  password: guardrails
+  domain: apps.cluster.example.com
 vllm_api_key: fake
 maas_endpoint: litemaas.abc.com

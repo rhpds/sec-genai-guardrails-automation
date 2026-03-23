@@ -3,7 +3,7 @@ kind: ConfigMap
 apiVersion: v1
 metadata:
   name: fms-orchestr8-config-gateway
-  namespace: {{ .Values.username }}-peachpal
+  namespace: {{ .Values.tenant.username }}-peachpal
   labels:
     app: fmstack-nlp
 data:

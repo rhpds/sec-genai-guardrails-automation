@@ -3,7 +3,7 @@ kind: ConfigMap
 apiVersion: v1
 metadata:
   name: fms-orchestr8-config-nlp
-  namespace: {{ .Values.username }}-peachpal
+  namespace: {{ .Values.tenant.username }}-peachpal
   annotations:
     helm.sh/weight: "0"
 data:
