@@ -1,0 +1,27 @@
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: fms-orchestr8-config-gateway
+  namespace: {{ .Values.username }}-peachpal
+  labels:
+    app: fmstack-nlp
+data:
+  config.yaml: |
+    orchestrator:
+      host: "localhost"
+      port: 8032
+    detectors:
+      - name: regex_competitor
+        input: true
+        output: true
+        detector_params:
+          regex:
+            - (?i)\b(orange|apple)s?\b
+    routes:
+      - name: all
+        detectors:
+          - regex_competitor
+          # add more as we go
+      - name: passthrough
+        detectors:

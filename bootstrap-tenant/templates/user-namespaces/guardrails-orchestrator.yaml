@@ -1,0 +1,28 @@
+---
+apiVersion: trustyai.opendatahub.io/v1alpha1
+kind: GuardrailsOrchestrator
+metadata:
+  name: guardrails-orchestrator
+  namespace: {{ .Values.username }}-peachpal
+  finalizers:
+    - trustyai.opendatahub.io/gorch-finalizer
+spec:
+  enableBuiltInDetectors: true
+  enableGuardrailsGateway: true
+  orchestratorConfig: fms-orchestr8-config-nlp
+  guardrailsGatewayConfig: "fms-orchestr8-config-gateway"
+  customDetectorsConfig: custom-detectors
+  env:
+    - name: API_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: peachpal-secrets
+          key: vllm-api-key
+    - name: MODEL_NAME
+      valueFrom:
+        configMapKeyRef:
+          name: peachpal-config
+          key: VLLM_MODEL
+    - name: PROMETHEUS_MULTIPROC_DIR
+      value: /tmp/prometheus_multiproc
+  replicas: 1

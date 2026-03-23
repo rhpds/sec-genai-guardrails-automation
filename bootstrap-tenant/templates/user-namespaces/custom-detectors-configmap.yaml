@@ -1,0 +1,74 @@
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: custom-detectors
+  namespace: {{ .Values.username }}-peachpal
+data:
+  custom_detectors.py: |-
+    import re
+    import requests
+    import logging
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    logger = logging.getLogger(__name__)
+
+    MODEL_URL = "https://{{ .Values.maas_endpoint | trimPrefix "https://" | trimPrefix "http://" }}/v1/chat/completions"
+    MODEL_NAME = "granite-3-2-8b-instruct"
+    API_TOKEN = "{{ .Values.vllm_api_key }}"
+
+    # === TURN POLICY LIST INTO PROMPTS ================================================================
+    REFUSAL_PROMPT = """Your task is to check if the following message looks like an LLM refusal message. Examples of refusals might be:
+     - Not answering the original question, and providing a stock answer
+     - Apologizing for an inability to help
+     - Refusing to help
+    Return "YES!" or "NO!".
+    """
+
+    # === HELPER FUNCTIONS =============================================================================
+    def _build_response(text, message, detection_type):
+        """Build the expected payload for the /detectors API"""
+        return {
+            "start": 0,
+            "end": len(text),
+            "text": message,
+            "detection_type": detection_type,
+            "detection": "guardrail",
+            "score": 1.0
+        }
+
+    def _chat_completion_to_model(user_prompt, system_prompt, headers, tokens=10):
+        """Send a chat-completion to the model"""
+        payload = {
+            "model": MODEL_NAME,
+            "messages": [
+                {"content": system_prompt, "role": "system"},
+                {"content": user_prompt, "role": "user"}
+            ],
+            "stop": "!", # stop generation as soon as the expected pattern is finished
+            "temperature": 0
+        }
+        auth_headers = {"Authorization": f"Bearer {API_TOKEN}"}
+        auth_headers.update(headers)
+        response = requests.post(MODEL_URL, json=payload, verify=False,
+                                 headers=auth_headers)
+        if response.status_code != 200:
+            raise RuntimeError(response.text)
+        return response.json()["choices"][0]['message']['content'].replace("[","")
+
+
+    # === MONITORING FUNCTIONS ======================================================================
+    from prometheus_client import Counter
+    refusal_metric = Counter(
+        "refusal_counter",
+        "Counts how many times the model has produced a refusal message"
+    )
+    @use_instruments(instruments=[refusal_metric])
+    @non_blocking(return_value=False)
+    def refusal_tracker(text: str, headers: dict):
+        response = _chat_completion_to_model(text, system_prompt=REFUSAL_PROMPT, headers=headers)
+        response = response.replace("Answer:","").strip()
+        print(f"REFUSAL TRACKER | Model response: `{response}`")
+        if response != 'NO':
+            refusal_metric.inc()
+        return False
