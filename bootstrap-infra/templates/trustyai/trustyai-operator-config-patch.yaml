@@ -2,155 +2,97 @@
 # Due to a race condition bug in the orchestrator (fix not yet landed downstream),
 # we override the orchestrator image in the operator config.
 #
-# The TrustyAI operator watches the ConfigMap and instantly reverts changes via
-# force Server-Side Apply. Simple patches or Replace syncs cannot win this race.
-#
-# Strategy: Use a PostSync hook Job that:
-# 1. Waits for TrustyAI component to be Ready (operator has finished setup)
-# 2. Scales down the operator to stop reconciliation
-# 3. Patches the ConfigMap with the custom image
-# 4. Scales the operator back up (it reads the ConfigMap on startup but does
-#    not revert values that are already set)
+# The TrustyAI operator uses force Server-Side Apply to manage the ConfigMap.
+# To win, we use a CronJob that continuously re-patches the field using
+# kubectl apply --server-side --force-conflicts with our own field manager.
+# This ensures our override persists even after operator reconciliation.
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: trustyai-config-patcher
   namespace: redhat-ods-applications
-  annotations:
-    argocd.argoproj.io/hook: PostSync
-    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+kind: Role
 metadata:
   name: trustyai-config-patcher
-  annotations:
-    argocd.argoproj.io/hook: PostSync
-    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+  namespace: redhat-ods-applications
 rules:
 - apiGroups: [""]
   resources: ["configmaps"]
-  resourceNames: ["trustyai-service-operator-config"]
-  verbs: ["get", "patch"]
-- apiGroups: ["apps"]
-  resources: ["deployments"]
-  resourceNames: ["trustyai-service-operator-controller-manager"]
-  verbs: ["get", "list", "watch", "patch", "update"]
-- apiGroups: ["apps"]
-  resources: ["deployments/scale"]
-  resourceNames: ["trustyai-service-operator-controller-manager"]
-  verbs: ["get", "list", "watch", "patch", "update"]
-- apiGroups: ["components.platform.opendatahub.io"]
-  resources: ["trustyais"]
-  verbs: ["get", "list"]
+  verbs: ["get", "patch", "update", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
+kind: RoleBinding
 metadata:
   name: trustyai-config-patcher
-  annotations:
-    argocd.argoproj.io/hook: PostSync
-    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+  namespace: redhat-ods-applications
 subjects:
 - kind: ServiceAccount
   name: trustyai-config-patcher
   namespace: redhat-ods-applications
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
+  kind: Role
   name: trustyai-config-patcher
 ---
 apiVersion: batch/v1
-kind: Job
+kind: CronJob
 metadata:
-  name: trustyai-config-patch
+  name: trustyai-config-patcher
   namespace: redhat-ods-applications
-  annotations:
-    argocd.argoproj.io/hook: PostSync
-    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 spec:
-  backoffLimit: 3
-  template:
+  schedule: "*/2 * * * *"
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  concurrencyPolicy: Replace
+  jobTemplate:
     spec:
-      serviceAccountName: trustyai-config-patcher
-      restartPolicy: OnFailure
-      containers:
-      - name: patch
-        image: registry.redhat.io/openshift4/ose-cli:latest
-        command:
-        - /bin/sh
-        - -c
-        - |
-          set -e
-          DESIRED_IMAGE="quay.io/ckavili/fms-guardrails-orchestrator:race-fix"
-          NAMESPACE="redhat-ods-applications"
-          CM_NAME="trustyai-service-operator-config"
-          DEPLOY_NAME="trustyai-service-operator-controller-manager"
+      backoffLimit: 1
+      template:
+        spec:
+          serviceAccountName: trustyai-config-patcher
+          restartPolicy: Never
+          containers:
+          - name: patch
+            image: registry.redhat.io/openshift4/ose-cli:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              DESIRED="quay.io/ckavili/fms-guardrails-orchestrator:race-fix"
+              CURRENT=$(oc get configmap trustyai-service-operator-config \
+                -n redhat-ods-applications \
+                -o jsonpath='{.data.guardrails-orchestrator-image}' 2>/dev/null)
 
-          echo "=== TrustyAI ConfigMap Patcher ==="
+              if [ "$CURRENT" = "$DESIRED" ]; then
+                echo "Image already set correctly. No action needed."
+                exit 0
+              fi
 
-          # Step 1: Wait for TrustyAI component to be Ready
-          echo "Step 1: Waiting for TrustyAI component to be Ready..."
-          for i in $(seq 1 60); do
-            PHASE=$(oc get trustyai default-trustyai -o jsonpath='{.status.phase}' 2>/dev/null || echo "NotFound")
-            if [ "$PHASE" = "Ready" ]; then
-              echo "  TrustyAI is Ready."
-              break
-            fi
-            echo "  Waiting... ($i/60) phase=$PHASE"
-            sleep 10
-          done
+              echo "Current: $CURRENT"
+              echo "Desired: $DESIRED"
+              echo "Patching..."
 
-          # Step 2: Scale down the operator
-          echo "Step 2: Scaling down operator..."
-          oc scale deployment/$DEPLOY_NAME -n $NAMESPACE --replicas=0
-          echo "  Waiting for operator pods to terminate..."
-          oc rollout status deployment/$DEPLOY_NAME -n $NAMESPACE --timeout=60s || true
-          sleep 5
+              cat <<PATCH | oc apply --server-side --force-conflicts --field-manager=guardrails-patcher -f -
+              apiVersion: v1
+              kind: ConfigMap
+              metadata:
+                name: trustyai-service-operator-config
+                namespace: redhat-ods-applications
+              data:
+                guardrails-orchestrator-image: "$DESIRED"
+              PATCH
 
-          # Step 3: Patch the ConfigMap
-          echo "Step 3: Patching ConfigMap..."
-          oc patch configmap $CM_NAME -n $NAMESPACE \
-            --type merge \
-            -p "{\"data\":{\"guardrails-orchestrator-image\":\"$DESIRED_IMAGE\"}}"
-
-          # Step 4: Verify
-          CURRENT=$(oc get configmap $CM_NAME -n $NAMESPACE \
-            -o jsonpath='{.data.guardrails-orchestrator-image}')
-          echo "  Current value: $CURRENT"
-
-          if [ "$CURRENT" = "$DESIRED_IMAGE" ]; then
-            echo "  Patch verified successfully!"
-          else
-            echo "  ERROR: Patch did not take effect!"
-            exit 1
-          fi
-
-          # Step 5: Scale operator back up
-          echo "Step 5: Scaling operator back up..."
-          oc scale deployment/$DEPLOY_NAME -n $NAMESPACE --replicas=1
-          oc rollout status deployment/$DEPLOY_NAME -n $NAMESPACE --timeout=120s
-
-          # Step 6: Wait and re-verify
-          echo "Step 6: Waiting 30s then verifying patch persisted..."
-          sleep 30
-          FINAL=$(oc get configmap $CM_NAME -n $NAMESPACE \
-            -o jsonpath='{.data.guardrails-orchestrator-image}')
-          echo "  Final value: $FINAL"
-
-          if [ "$FINAL" = "$DESIRED_IMAGE" ]; then
-            echo "=== SUCCESS: Image override persisted ==="
-          else
-            echo "=== WARNING: Operator reverted the patch. Reapplying... ==="
-            oc scale deployment/$DEPLOY_NAME -n $NAMESPACE --replicas=0
-            sleep 5
-            oc patch configmap $CM_NAME -n $NAMESPACE \
-              --type merge \
-              -p "{\"data\":{\"guardrails-orchestrator-image\":\"$DESIRED_IMAGE\"}}"
-            oc scale deployment/$DEPLOY_NAME -n $NAMESPACE --replicas=1
-            echo "  Reapplied. Final value:"
-            oc get configmap $CM_NAME -n $NAMESPACE \
-              -o jsonpath='{.data.guardrails-orchestrator-image}'
-            echo ""
-          fi
+              FINAL=$(oc get configmap trustyai-service-operator-config \
+                -n redhat-ods-applications \
+                -o jsonpath='{.data.guardrails-orchestrator-image}')
+              echo "Final: $FINAL"
+            resources:
+              requests:
+                cpu: 10m
+                memory: 64Mi
+              limits:
+                cpu: 100m
+                memory: 128Mi
