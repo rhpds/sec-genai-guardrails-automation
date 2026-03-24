@@ -1,5 +1,5 @@
-# After TrustyAI is fully Ready, patch the DataScienceCluster to set
-# TrustyAI to Unmanaged. This stops rhods-operator from continuously
+# After TrustyAI is fully Ready, set the management-state annotation to
+# Unmanaged on the TrustyAI CR. This stops rhods-operator from continuously
 # reconciling the ConfigMap, allowing our image override to persist.
 # The TrustyAI operator deployment stays running and processes CRs normally.
 ---
@@ -20,12 +20,9 @@ metadata:
     argocd.argoproj.io/hook: PostSync
     argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 rules:
-- apiGroups: ["datasciencecluster.opendatahub.io"]
-  resources: ["datascienceclusters"]
-  verbs: ["get", "patch"]
 - apiGroups: ["components.platform.opendatahub.io"]
   resources: ["trustyais"]
-  verbs: ["get", "list"]
+  verbs: ["get", "list", "patch"]
 - apiGroups: [""]
   resources: ["configmaps"]
   verbs: ["get", "patch"]
@@ -87,9 +84,9 @@ spec:
             exit 1
           fi
 
-          echo "Step 2: Setting TrustyAI to Unmanaged in DataScienceCluster..."
-          oc patch datasciencecluster default-dsc --type=merge \
-            -p '{"spec":{"components":{"trustyai":{"managementState":"Unmanaged"}}}}'
+          echo "Step 2: Setting TrustyAI CR annotation to Unmanaged..."
+          oc patch trustyai default-trustyai --type=merge \
+            -p '{"metadata":{"annotations":{"component.opendatahub.io/management-state":"Unmanaged"}}}'
 
           echo "Step 3: Waiting for operator to stop reconciling..."
           sleep 10
