@@ -2,9 +2,10 @@
 # Due to a race condition bug in the orchestrator (fix not yet landed downstream),
 # we override the orchestrator image in the operator config.
 #
-# The TrustyAI operator continuously reconciles the ConfigMap.
-# We use a CronJob that re-patches the field every 2 minutes using
-# oc patch --type=merge to ensure our override persists.
+# The TrustyAI operator continuously reconciles the ConfigMap via force SSA.
+# We use a CronJob that re-patches the field every 2 minutes using the
+# Kubernetes API directly with server-side apply and a custom field manager
+# to take ownership of the guardrails-orchestrator-image field.
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -61,9 +62,16 @@ spec:
             - -c
             - |
               DESIRED="quay.io/ckavili/fms-guardrails-orchestrator:race-fix"
-              CURRENT=$(oc get configmap trustyai-service-operator-config \
-                -n redhat-ods-applications \
-                -o jsonpath='{.data.guardrails-orchestrator-image}' 2>/dev/null)
+              NS="redhat-ods-applications"
+              CM="trustyai-service-operator-config"
+              API="https://kubernetes.default.svc"
+              TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+              CA=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+
+              # Get current value
+              CURRENT=$(curl -s --cacert $CA -H "Authorization: Bearer $TOKEN" \
+                "$API/api/v1/namespaces/$NS/configmaps/$CM" | \
+                python3 -c "import sys,json; print(json.load(sys.stdin).get('data',{}).get('guardrails-orchestrator-image',''))" 2>/dev/null)
 
               if [ "$CURRENT" = "$DESIRED" ]; then
                 echo "Image already set correctly. No action needed."
@@ -72,21 +80,22 @@ spec:
 
               echo "Current: $CURRENT"
               echo "Desired: $DESIRED"
-              echo "Patching..."
+              echo "Patching with server-side apply..."
 
-              oc patch configmap trustyai-service-operator-config \
-                -n redhat-ods-applications \
-                --type=merge \
-                -p "{\"data\":{\"guardrails-orchestrator-image\":\"$DESIRED\"}}"
+              # Server-side apply with force and custom field manager
+              BODY="{\"apiVersion\":\"v1\",\"kind\":\"ConfigMap\",\"metadata\":{\"name\":\"$CM\",\"namespace\":\"$NS\"},\"data\":{\"guardrails-orchestrator-image\":\"$DESIRED\"}}"
+              RESULT=$(curl -s --cacert $CA -H "Authorization: Bearer $TOKEN" \
+                -H "Content-Type: application/apply-patch+yaml" \
+                -X PATCH \
+                "$API/api/v1/namespaces/$NS/configmaps/$CM?fieldManager=guardrails-patcher&force=true" \
+                -d "$BODY")
 
-              FINAL=$(oc get configmap trustyai-service-operator-config \
-                -n redhat-ods-applications \
-                -o jsonpath='{.data.guardrails-orchestrator-image}')
+              FINAL=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('data',{}).get('guardrails-orchestrator-image','ERROR'))" 2>/dev/null)
               echo "Final: $FINAL"
             resources:
               requests:
                 cpu: 10m
-                memory: 64Mi
+                memory: 32Mi
               limits:
                 cpu: 100m
-                memory: 512Mi
+                memory: 128Mi
