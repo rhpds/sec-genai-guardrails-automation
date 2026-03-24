@@ -3,9 +3,9 @@
 # we override the orchestrator image in the operator config.
 #
 # The TrustyAI operator continuously reconciles the ConfigMap via force SSA.
-# We use a CronJob that re-patches the field every 2 minutes using the
-# Kubernetes API directly with server-side apply and a custom field manager
-# to take ownership of the guardrails-orchestrator-image field.
+# We run a lightweight Deployment that loops every 30s, using the Kubernetes
+# API with server-side apply (force=true, custom field manager) to re-patch
+# the image whenever the operator reverts it.
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -37,65 +37,57 @@ roleRef:
   kind: Role
   name: trustyai-config-patcher
 ---
-apiVersion: batch/v1
-kind: CronJob
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: trustyai-config-patcher
   namespace: redhat-ods-applications
 spec:
-  schedule: "*/2 * * * *"
-  successfulJobsHistoryLimit: 1
-  failedJobsHistoryLimit: 1
-  concurrencyPolicy: Replace
-  jobTemplate:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: trustyai-config-patcher
+  template:
+    metadata:
+      labels:
+        app: trustyai-config-patcher
     spec:
-      backoffLimit: 1
-      template:
-        spec:
-          serviceAccountName: trustyai-config-patcher
-          restartPolicy: Never
-          containers:
-          - name: patch
-            image: registry.redhat.io/openshift4/ose-cli:latest
-            command:
-            - /bin/sh
-            - -c
-            - |
-              DESIRED="quay.io/ckavili/fms-guardrails-orchestrator:race-fix"
-              NS="redhat-ods-applications"
-              CM="trustyai-service-operator-config"
-              API="https://kubernetes.default.svc"
-              TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
-              CA=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+      serviceAccountName: trustyai-config-patcher
+      containers:
+      - name: patch
+        image: registry.redhat.io/openshift4/ose-cli:latest
+        command:
+        - /bin/sh
+        - -c
+        - |
+          DESIRED="quay.io/ckavili/fms-guardrails-orchestrator:race-fix"
+          NS="redhat-ods-applications"
+          CM="trustyai-service-operator-config"
+          API="https://kubernetes.default.svc"
+          CA=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          BODY="{\"apiVersion\":\"v1\",\"kind\":\"ConfigMap\",\"metadata\":{\"name\":\"$CM\",\"namespace\":\"$NS\"},\"data\":{\"guardrails-orchestrator-image\":\"$DESIRED\"}}"
 
-              # Get current value
-              CURRENT=$(curl -s --cacert $CA -H "Authorization: Bearer $TOKEN" \
-                "$API/api/v1/namespaces/$NS/configmaps/$CM" | \
-                python3 -c "import sys,json; print(json.load(sys.stdin).get('data',{}).get('guardrails-orchestrator-image',''))" 2>/dev/null)
+          echo "Starting TrustyAI config patcher loop..."
+          while true; do
+            TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+            CURRENT=$(curl -s --cacert $CA -H "Authorization: Bearer $TOKEN" \
+              "$API/api/v1/namespaces/$NS/configmaps/$CM" | \
+              python3 -c "import sys,json; print(json.load(sys.stdin).get('data',{}).get('guardrails-orchestrator-image',''))" 2>/dev/null)
 
-              if [ "$CURRENT" = "$DESIRED" ]; then
-                echo "Image already set correctly. No action needed."
-                exit 0
-              fi
-
-              echo "Current: $CURRENT"
-              echo "Desired: $DESIRED"
-              echo "Patching with server-side apply..."
-
-              # Server-side apply with force and custom field manager
-              BODY="{\"apiVersion\":\"v1\",\"kind\":\"ConfigMap\",\"metadata\":{\"name\":\"$CM\",\"namespace\":\"$NS\"},\"data\":{\"guardrails-orchestrator-image\":\"$DESIRED\"}}"
-              RESULT=$(curl -s --cacert $CA -H "Authorization: Bearer $TOKEN" \
+            if [ "$CURRENT" != "$DESIRED" ]; then
+              echo "$(date): Patching image from $CURRENT"
+              curl -s --cacert $CA -H "Authorization: Bearer $TOKEN" \
                 -H "Content-Type: application/apply-patch+yaml" \
                 -X PATCH \
                 "$API/api/v1/namespaces/$NS/configmaps/$CM?fieldManager=guardrails-patcher&force=true" \
-                -d "$BODY")
-
-              FINAL=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('data',{}).get('guardrails-orchestrator-image','ERROR'))" 2>/dev/null)
-              echo "Final: $FINAL"
-            resources:
-              requests:
-                cpu: 10m
-                memory: 32Mi
-              limits:
-                cpu: 100m
-                memory: 128Mi
+                -d "$BODY" > /dev/null
+            fi
+            sleep 30
+          done
+        resources:
+          requests:
+            cpu: 5m
+            memory: 32Mi
+          limits:
+            cpu: 50m
+            memory: 128Mi
