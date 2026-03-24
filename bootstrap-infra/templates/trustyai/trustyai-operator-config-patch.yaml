@@ -2,7 +2,8 @@
 # Due to a race condition bug in the orchestrator (fix not yet landed downstream),
 # we override the orchestrator image in the operator config.
 # Setting opendatahub.io/managed: "false" prevents the operator from reverting the change.
-# ServerSideApply ensures ArgoCD merges these fields without replacing the full ConfigMap.
+# Replace=true forces ArgoCD to fully replace the ConfigMap so our override takes effect,
+# since ServerSideApply partial patches lose the field ownership conflict to the operator.
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -11,6 +12,33 @@ metadata:
   namespace: redhat-ods-applications
   annotations:
     opendatahub.io/managed: "false"
-    argocd.argoproj.io/sync-options: ServerSideApply=true
+    argocd.argoproj.io/sync-options: Replace=true,Prune=false
 data:
+  garak-provider-image: >-
+    registry.redhat.io/rhoai/odh-trustyai-garak-lls-provider-dsp-rhel9@sha256:8594e9940d75f30daa89c58b54950f84e5190209c0c3b4b9b8f6fd58bff21962
+  guardrails-built-in-detector-image: >-
+    registry.redhat.io/rhoai/odh-built-in-detector-rhel9@sha256:0e5c1491e1e31ac6cc993efe78e4a8afa9c2d86635b989eaf4508e18607cf2da
   guardrails-orchestrator-image: "quay.io/ckavili/fms-guardrails-orchestrator:race-fix"
+  guardrails-sidecar-gateway-image: >-
+    registry.redhat.io/rhoai/odh-trustyai-vllm-orchestrator-gateway-rhel9@sha256:581d8283d38fe902061d52391da182d74d45d41c543d7df130f1e0e76fa9fd06
+  kServeServerless: enabled
+  kube-rbac-proxy: >-
+    registry.redhat.io/rhoai/odh-kube-auth-proxy-rhel9@sha256:4bff9c9b812872be081e64102cbacb711adfacd1862b5593e9809a6822720131
+  lmes-allow-code-execution: 'false'
+  lmes-allow-online: 'false'
+  lmes-default-batch-size: '8'
+  lmes-detect-device: 'true'
+  lmes-driver-image: >-
+    registry.redhat.io/rhoai/odh-ta-lmes-driver-rhel9@sha256:83896c6dde10dfb8587c9117c732d2e5a3f1732c804ee72acb0d9621dc1076a8
+  lmes-image-pull-policy: Always
+  lmes-max-batch-size: '24'
+  lmes-pod-checking-interval: 10s
+  lmes-pod-image: >-
+    registry.redhat.io/rhoai/odh-ta-lmes-job-rhel9@sha256:fcc88c138da152f741288f9da65d4afca4b626e0eb6516fa9832e7281a0cfce0
+  nemo-guardrails-image: quay.io/trustyai/nemo-guardrails-server:latest
+  ragas-provider-image: >-
+    registry.redhat.io/ubi9/python-312@sha256:34263471b5e86b0704054e817d7703d0063b0909a64bd95360f4a8b0c730d970
+  trustyaiOperatorImage: >-
+    registry.redhat.io/rhoai/odh-trustyai-service-operator-rhel9@sha256:cb857537308a33c36a27d221fb0b5cb0c7f1c4a2800b74becac6c9d77f35253c
+  trustyaiServiceImage: >-
+    registry.redhat.io/rhoai/odh-trustyai-service-rhel9@sha256:21099c08eca35b0cbb020f7e48eeba1e24e4fd8dbc6c0a627e43f6186afd5c95

@@ -4,6 +4,9 @@ kind: ConfigMap
 metadata:
   name: peachpal-dashboard
   namespace: openshift-config-managed
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
   labels:
     app: peachpal
     app.kubernetes.io/name: peachpal
