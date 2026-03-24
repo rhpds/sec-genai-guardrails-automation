@@ -2,10 +2,9 @@
 # Due to a race condition bug in the orchestrator (fix not yet landed downstream),
 # we override the orchestrator image in the operator config.
 #
-# The TrustyAI operator uses force Server-Side Apply to manage the ConfigMap.
-# To win, we use a CronJob that continuously re-patches the field using
-# kubectl apply --server-side --force-conflicts with our own field manager.
-# This ensures our override persists even after operator reconciliation.
+# The TrustyAI operator continuously reconciles the ConfigMap.
+# We use a CronJob that re-patches the field every 2 minutes using
+# oc patch --type=merge to ensure our override persists.
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -75,15 +74,10 @@ spec:
               echo "Desired: $DESIRED"
               echo "Patching..."
 
-              cat <<PATCH | oc apply --server-side --force-conflicts --field-manager=guardrails-patcher -f -
-              apiVersion: v1
-              kind: ConfigMap
-              metadata:
-                name: trustyai-service-operator-config
-                namespace: redhat-ods-applications
-              data:
-                guardrails-orchestrator-image: "$DESIRED"
-              PATCH
+              oc patch configmap trustyai-service-operator-config \
+                -n redhat-ods-applications \
+                --type=merge \
+                -p "{\"data\":{\"guardrails-orchestrator-image\":\"$DESIRED\"}}"
 
               FINAL=$(oc get configmap trustyai-service-operator-config \
                 -n redhat-ods-applications \
@@ -95,4 +89,4 @@ spec:
                 memory: 64Mi
               limits:
                 cpu: 100m
-                memory: 256Mi
+                memory: 512Mi
