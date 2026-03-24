@@ -1,0 +1,98 @@
+# Workaround: Override the orchestrator image to fix a race condition bug.
+# The rhods-operator continuously reconciles the ConfigMap that provides
+# the default image, so we patch the Deployment directly after creation.
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: orchestrator-image-patcher
+  namespace: {{ .Values.tenant.username }}-peachpal
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: orchestrator-image-patcher
+  namespace: {{ .Values.tenant.username }}-peachpal
+rules:
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "watch", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: orchestrator-image-patcher
+  namespace: {{ .Values.tenant.username }}-peachpal
+subjects:
+- kind: ServiceAccount
+  name: orchestrator-image-patcher
+  namespace: {{ .Values.tenant.username }}-peachpal
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: orchestrator-image-patcher
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: orchestrator-image-patcher
+  namespace: {{ .Values.tenant.username }}-peachpal
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 10
+  template:
+    spec:
+      serviceAccountName: orchestrator-image-patcher
+      restartPolicy: OnFailure
+      containers:
+      - name: patch
+        image: registry.redhat.io/openshift4/ose-cli:latest
+        command:
+        - /bin/sh
+        - -c
+        - |
+          DESIRED="quay.io/ckavili/fms-guardrails-orchestrator:race-fix"
+          NS="{{ .Values.tenant.username }}-peachpal"
+          DEPLOY="guardrails-orchestrator"
+
+          echo "Waiting for deployment $DEPLOY to exist..."
+          for i in $(seq 1 60); do
+            if oc get deployment $DEPLOY -n $NS &>/dev/null; then
+              echo "Deployment found."
+              break
+            fi
+            echo "  Attempt $i/60 - waiting 10s..."
+            sleep 10
+          done
+
+          if ! oc get deployment $DEPLOY -n $NS &>/dev/null; then
+            echo "ERROR: Deployment $DEPLOY not found after 10 minutes."
+            exit 1
+          fi
+
+          echo "Patching container image to $DESIRED..."
+          oc patch deployment $DEPLOY -n $NS --type=json \
+            -p "[{\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/0/image\",\"value\":\"$DESIRED\"}]"
+
+          echo "Waiting for rollout..."
+          oc rollout status deployment/$DEPLOY -n $NS --timeout=300s
+
+          CURRENT=$(oc get deployment $DEPLOY -n $NS \
+            -o jsonpath='{.spec.template.spec.containers[0].image}')
+          echo "Final image: $CURRENT"
+
+          if [ "$CURRENT" = "$DESIRED" ]; then
+            echo "SUCCESS: Image patched correctly."
+          else
+            echo "WARNING: Image mismatch. Got: $CURRENT"
+            exit 1
+          fi
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 512Mi
