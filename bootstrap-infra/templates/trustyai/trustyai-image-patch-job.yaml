@@ -1,0 +1,92 @@
+# PostSync hook to patch the orchestrator image after the main sync.
+# The ConfigMap overlay (trustyai-operator-config-patch.yaml) sets
+# opendatahub.io/managed: "false" which prevents the operator from
+# reverting changes. This Job re-applies the image override after
+# sync to ensure it takes effect.
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: trustyai-image-patcher
+  namespace: redhat-ods-applications
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: trustyai-image-patcher
+  namespace: redhat-ods-applications
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: trustyai-image-patcher
+  namespace: redhat-ods-applications
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+subjects:
+- kind: ServiceAccount
+  name: trustyai-image-patcher
+  namespace: redhat-ods-applications
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: trustyai-image-patcher
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: trustyai-image-patcher
+  namespace: redhat-ods-applications
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      serviceAccountName: trustyai-image-patcher
+      restartPolicy: OnFailure
+      containers:
+      - name: patch
+        image: registry.redhat.io/openshift4/ose-cli:latest
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          DESIRED="quay.io/ckavili/fms-guardrails-orchestrator:race-fix"
+
+          echo "Patching ConfigMap with desired orchestrator image..."
+          oc patch configmap trustyai-service-operator-config \
+            -n redhat-ods-applications --type=merge \
+            -p "{\"data\":{\"guardrails-orchestrator-image\":\"$DESIRED\"}}"
+
+          FINAL=$(oc get configmap trustyai-service-operator-config \
+            -n redhat-ods-applications \
+            -o jsonpath='{.data.guardrails-orchestrator-image}')
+          echo "Final image: $FINAL"
+
+          if [ "$FINAL" = "$DESIRED" ]; then
+            echo "SUCCESS"
+          else
+            echo "FAILED - image not set"
+            exit 1
+          fi
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 512Mi

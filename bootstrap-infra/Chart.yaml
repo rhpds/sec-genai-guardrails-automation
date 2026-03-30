@@ -1,0 +1,10 @@
+apiVersion: v2
+name: summit26-guardrails-lab-infra
+description: A Helm chart to deploy Summit26 Guardrails Lab Infrastructure (cluster-level)
+type: application
+version: 1.0.0
+appVersion: 1.0.0
+maintainers:
+  - name: sarabanderby
+  - name: ckavili
+  - name: rshah

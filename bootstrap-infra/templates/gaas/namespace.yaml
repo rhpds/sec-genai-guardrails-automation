@@ -1,0 +1,14 @@
+---
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: gaas
+  labels:
+    kubernetes.io/metadata.name: gaas
+  annotations:
+    openshift.io/description: 'Guardrails As A Service Namespace'
+    openshift.io/display-name: 'gaas'
+    openshift.io/requester: ''
+spec:
+  finalizers:
+    - kubernetes

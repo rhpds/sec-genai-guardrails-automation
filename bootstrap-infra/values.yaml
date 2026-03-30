@@ -1,0 +1,3 @@
+---
+# No user-specific values needed for infra chart
+# All infrastructure resources are cluster-scoped

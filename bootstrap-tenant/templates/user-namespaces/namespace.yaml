@@ -1,0 +1,29 @@
+---
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: {{ .Values.tenant.username }}-peachpal
+  labels:
+    kubernetes.io/metadata.name: {{ .Values.tenant.username }}-peachpal
+    opendatahub.io/dashboard: 'true'
+  annotations:
+    openshift.io/description: '{{ .Values.tenant.username }} Peachpal Development Environment'
+    openshift.io/display-name: '{{ .Values.tenant.username }}-peachpal'
+    openshift.io/requester: '{{ .Values.tenant.username }}'
+spec:
+  finalizers:
+    - kubernetes
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ .Values.tenant.username }}-peachpal-admin
+  namespace: {{ .Values.tenant.username }}-peachpal
+subjects:
+  - kind: User
+    apiGroup: rbac.authorization.k8s.io
+    name: {{ .Values.tenant.username }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: admin

@@ -1,0 +1,35 @@
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: fms-orchestr8-config-nlp
+  namespace: {{ .Values.tenant.username }}-peachpal
+  annotations:
+    helm.sh/weight: "0"
+data:
+  config.yaml: |
+    passthrough_headers:
+      - authorization
+    tls:
+      external_llm:
+        insecure: true
+        cert_path: /dev/null
+    chunkers:
+      sentence:
+        type: sentence
+        service:
+            hostname: chunker-service.gaas.svc.cluster.local
+            port: 8085
+    openai: 
+      service:
+        hostname: {{ $.Values.maas_endpoint | trimPrefix "https://" | trimPrefix "http://" | trimSuffix ":443" }}
+        port: 443
+        tls: external_llm
+    detectors:
+      regex_competitor:
+        type: text_contents
+        service:
+            hostname: "127.0.0.1"
+            port: 8080
+        chunker_id: sentence
+        default_threshold: 0.5
