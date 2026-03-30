@@ -20,9 +20,9 @@ data:
         service:
             hostname: chunker-service.gaas.svc.cluster.local
             port: 8085
-    openai:
+    openai: 
       service:
-        hostname: {{ .Values.maas_endpoint | trimPrefix "https://" | trimPrefix "http://" | trimSuffix ":443" }}
+        hostname: {{ $.Values.maas_endpoint | trimPrefix "https://" | trimPrefix "http://" | trimSuffix ":443" }}
         port: 443
         tls: external_llm
     detectors:

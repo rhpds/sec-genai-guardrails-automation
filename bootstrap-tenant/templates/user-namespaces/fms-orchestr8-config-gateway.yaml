@@ -16,7 +16,7 @@ data:
         input: true
         output: true
         detector_params:
-          regex:
+          regex:    
             - (?i)\b(orange|apple)s?\b
     routes:
       - name: all
