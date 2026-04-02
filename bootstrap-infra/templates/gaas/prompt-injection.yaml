@@ -63,10 +63,10 @@ spec:
       name: ''
       resources:
         limits:
-          cpu: '2'
+          cpu: '4'
           memory: 12Gi
         requests:
-          cpu: '1'
+          cpu: '2'
           memory: 8Gi
       runtime: guardrails-detector-runtime-prompt-injection
       storage:
