@@ -62,10 +62,10 @@ spec:
       name: ''
       resources:
         limits:
-          cpu: '2'
+          cpu: '4'
           memory: 24Gi
         requests:
-          cpu: '1'
+          cpu: '2'
           memory: 16Gi
       runtime: guardrails-detector-runtime-hap
       storage:
