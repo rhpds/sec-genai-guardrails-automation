@@ -50,7 +50,7 @@ spec:
     spec:
       containers:
         - name: peachpal
-          image: quay.io/ckavili/peachpal:0.0.1
+          image: quay.io/ckavili/peachpal:0.0.2
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
