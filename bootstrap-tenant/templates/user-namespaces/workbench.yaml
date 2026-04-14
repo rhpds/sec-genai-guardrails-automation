@@ -5,6 +5,7 @@ metadata:
   annotations:
     openshift.io/display-name: peachpal-redteaming-storage
   namespace: {{ .Values.tenant.username }}-peachpal
+  name: peachpal-redteaming-storage
   labels:
     opendatahub.io/dashboard: 'true'
 spec:
