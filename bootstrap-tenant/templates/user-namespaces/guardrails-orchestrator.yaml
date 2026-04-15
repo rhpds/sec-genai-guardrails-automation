@@ -12,9 +12,6 @@ spec:
   orchestratorConfig: fms-orchestr8-config-nlp
   guardrailsGatewayConfig: "fms-orchestr8-config-gateway"
   customDetectorsConfig: custom-detectors
-  gatewayRouteAnnotations:
-    haproxy.router.openshift.io/timeout: "300s"
-    haproxy.router.openshift.io/timeout-tunnel: "300s"
   env:
     - name: API_TOKEN
       valueFrom:
