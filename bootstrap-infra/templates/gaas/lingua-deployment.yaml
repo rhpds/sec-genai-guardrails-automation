@@ -7,7 +7,7 @@ metadata:
   labels:
     app: lingua-detector
 spec:
-  replicas: 1
+  replicas: 5
   selector:
     matchLabels:
       app: lingua-detector
@@ -16,6 +16,15 @@ spec:
       labels:
         app: lingua-detector
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/worker
+                    operator: Exists
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: DoesNotExist
       containers:
         - name: lingua-detector
           image: quay.io/rlundber/lingua-language-detector:0.18
